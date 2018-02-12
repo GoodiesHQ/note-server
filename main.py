@@ -13,6 +13,8 @@ database and has very simple interactions.
 """
 
 from configparser import ConfigParser
+from datetime import timedelta
+import asyncio
 import os
 import sys
 
@@ -23,7 +25,7 @@ from sanic.response import html as response_html, redirect
 import asyncpg
 
 from notesrv.api import bp
-from notesrv.db import PostgresNoteDOA
+from notesrv.db import PostgresNoteDOA, BaseNoteDOA
 
 UID_LENGTH = 21
 
@@ -71,6 +73,12 @@ async def init(app, loop):
         print("'{}' is an invalid database mode.", cfg["mode"])
         sys.exit(1)
 
+    async def prune_every(seconds: int, doa: BaseNoteDOA):
+        await doa.prune_expired()
+        await asyncio.sleep(seconds)
+        asyncio.ensure_future(prune_every(seconds, doa), loop=loop)
+
+    asyncio.ensure_future(prune_every(timedelta(minutes=6).total_seconds(), app.config.doa), loop=loop)
     await app.config.doa.create()
 
 
